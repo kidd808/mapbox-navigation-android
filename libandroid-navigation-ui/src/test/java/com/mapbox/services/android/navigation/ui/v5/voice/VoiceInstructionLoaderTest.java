@@ -4,6 +4,7 @@ import android.content.Context;
 
 import com.mapbox.api.speech.v1.MapboxSpeech;
 import com.mapbox.services.android.navigation.ui.v5.BaseTest;
+import com.mapbox.services.android.navigation.ui.v5.ConnectivityStatusProvider;
 
 import org.junit.Test;
 
@@ -20,6 +21,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 public class VoiceInstructionLoaderTest extends BaseTest {
@@ -44,7 +46,6 @@ public class VoiceInstructionLoaderTest extends BaseTest {
 
   @Test
   public void checksRequestEnqueuedIfCacheIsNotClosedAndMapboxSpeechBuilderIsNotNull() {
-    Context anyContext = mock(Context.class);
     Cache anyCache = mock(Cache.class);
     when(anyCache.isClosed()).thenReturn(false);
     MapboxSpeech.Builder aSpeechBuilder = mock(MapboxSpeech.Builder.class);
@@ -52,8 +53,9 @@ public class VoiceInstructionLoaderTest extends BaseTest {
     when(aSpeechBuilder.textType(anyString())).thenReturn(aSpeechBuilder);
     MapboxSpeech aSpeech = mock(MapboxSpeech.class);
     when(aSpeechBuilder.build()).thenReturn(aSpeech);
-    VoiceInstructionLoader theVoiceInstructionLoader = new VoiceInstructionLoader(anyContext, "any_access_token",
-      anyCache, aSpeechBuilder);
+    ConnectivityStatusProvider connectivityStatus = mock(ConnectivityStatusProvider.class);
+    VoiceInstructionLoader theVoiceInstructionLoader = new VoiceInstructionLoader("any_access_token",
+      anyCache, aSpeechBuilder, connectivityStatus);
     Callback aCallback = mock(Callback.class);
 
     theVoiceInstructionLoader.requestInstruction("anyInstruction", "anyType", aCallback);
@@ -63,13 +65,13 @@ public class VoiceInstructionLoaderTest extends BaseTest {
 
   @Test
   public void checksRequestNotEnqueuedIfCacheIsClosed() {
-    Context anyContext = mock(Context.class);
     Cache anyCache = mock(Cache.class);
     when(anyCache.isClosed()).thenReturn(true);
     MapboxSpeech.Builder anySpeechBuilder = mock(MapboxSpeech.Builder.class);
     MapboxSpeech aSpeech = mock(MapboxSpeech.class);
-    VoiceInstructionLoader theVoiceInstructionLoader = new VoiceInstructionLoader(anyContext, "any_access_token",
-      anyCache, anySpeechBuilder);
+    ConnectivityStatusProvider connectivityStatus = mock(ConnectivityStatusProvider.class);
+    VoiceInstructionLoader theVoiceInstructionLoader = new VoiceInstructionLoader("any_access_token",
+      anyCache, anySpeechBuilder, connectivityStatus);
     Callback aCallback = mock(Callback.class);
 
     theVoiceInstructionLoader.requestInstruction("anyInstruction", "anyType", aCallback);
@@ -79,18 +81,33 @@ public class VoiceInstructionLoaderTest extends BaseTest {
 
   @Test
   public void checksRequestNotEnqueuedIfMapboxSpeechBuilderIsNull() {
-    Context anyContext = mock(Context.class);
     Cache anyCache = mock(Cache.class);
     when(anyCache.isClosed()).thenReturn(false);
     MapboxSpeech.Builder nullSpeechBuilder = null;
     MapboxSpeech aSpeech = mock(MapboxSpeech.class);
-    VoiceInstructionLoader theVoiceInstructionLoader = new VoiceInstructionLoader(anyContext, "any_access_token",
-      anyCache, nullSpeechBuilder);
+    ConnectivityStatusProvider connectivityStatus = mock(ConnectivityStatusProvider.class);
+    VoiceInstructionLoader theVoiceInstructionLoader = new VoiceInstructionLoader("any_access_token",
+      anyCache, nullSpeechBuilder, connectivityStatus);
     Callback aCallback = mock(Callback.class);
 
     theVoiceInstructionLoader.requestInstruction("anyInstruction", "anyType", aCallback);
 
     verify(aSpeech, times(0)).enqueueCall(eq(aCallback));
+  }
+
+  @Test
+  public void checksRequestNotEnqueuedIfNoConnection() {
+    Cache anyCache = mock(Cache.class);
+    MapboxSpeech.Builder aSpeechBuilder = mock(MapboxSpeech.Builder.class);
+    ConnectivityStatusProvider connectivityStatus = mock(ConnectivityStatusProvider.class);
+    when(connectivityStatus.isConnected()).thenReturn(false);
+    VoiceInstructionLoader theVoiceInstructionLoader = new VoiceInstructionLoader("any_access_token", anyCache,
+      aSpeechBuilder, connectivityStatus);
+    List<String> urlsToBeCached = buildUrlsToCache();
+
+    theVoiceInstructionLoader.cacheInstructions(urlsToBeCached);
+
+    verifyZeroInteractions(aSpeechBuilder);
   }
 
   private List<String> buildUrlsToCache() {
